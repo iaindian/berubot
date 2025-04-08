@@ -17,7 +17,7 @@ CREDS_FILE = "credentials.json"
  
 if GOOGLE_CREDENTIALS:
     with open(CREDS_FILE, "w") as f:
-        f.write(GOOGLE_CREDENTIALS)
+        f.write(GOOGLE_CREDENTIALS.replace('\\n', '\n'))
  
 SPREADSHEET_NAME = "Request_Sheet"
 MAX_REQUESTS = 50
