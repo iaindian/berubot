@@ -7,6 +7,7 @@ from flask import Flask, render_template_string, redirect
 import threading
 import requests
 import logging
+import base64
 import os
 import json
  
@@ -16,8 +17,9 @@ GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
 CREDS_FILE = "credentials.json"
  
 if GOOGLE_CREDENTIALS:
+    creds_json = base64.b64decode(GOOGLE_CREDENTIALS).decode('utf-8')
     with open(CREDS_FILE, "w") as f:
-        f.write(GOOGLE_CREDENTIALS.replace('\\\\n', '\n'))
+        f.write(creds_json)
     
     with open(CREDS_FILE, "r") as f:
         print("🔍 DEBUG: Contents of credentials.json:\n", f.read())
