@@ -12,8 +12,66 @@ import os
 import json
 import asyncio
 
-# (Everything above stays unchanged from your current code...)
-# Add remaining bot logic below:
+request_queue = []
+MAX_REQUESTS = 50
+
+if os.path.exists("queue.json"):
+    with open("queue.json", "r") as f:
+        request_queue = json.load(f)
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_ID = int(os.environ.get("ADMIN_ID"))
+GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
+CREDS_FILE = "credentials.json"
+
+if GOOGLE_CREDENTIALS:
+    creds_json = base64.b64decode(GOOGLE_CREDENTIALS).decode('utf-8')
+    with open(CREDS_FILE, "w") as f:
+        f.write(creds_json)
+    with open(CREDS_FILE, "r") as f:
+        print("🔍 DEBUG: Contents of credentials.json:\n", f.read())
+
+def is_admin(user_id):
+    return user_id == ADMIN_ID
+
+def get_user_menu(user_id):
+    has_request = any(r["id"] == user_id for r in request_queue)
+    buttons = [[InlineKeyboardButton("Check Status", callback_data="check_status")]]
+    if has_request:
+        buttons.append([InlineKeyboardButton("Cancel Request", callback_data="cancel_request")])
+    else:
+        buttons.append([InlineKeyboardButton("Submit Request", callback_data="submit_request")])
+    return InlineKeyboardMarkup(buttons)
+
+def save_queue():
+    with open("queue.json", "w") as f:
+        json.dump(request_queue, f)
+
+def reset_queue():
+    global request_queue
+    request_queue.clear()
+    if os.path.exists("queue.json"):
+        os.remove("queue.json")
+    print("Queue and file cleared.")
+
+async def send_temp_message(bot, chat_id, text, **kwargs):
+    try:
+        msg = await bot.send_message(chat_id=chat_id, text=text, **kwargs)
+        await asyncio.sleep(60)
+        await bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
+    except Exception as e:
+        print("⚠️ Failed to auto-delete message:", e)
+
+# Welcome new users with temp message
+async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    for member in update.message.new_chat_members:
+        name = member.full_name
+        username = f"@{member.username}" if member.username else name
+        await send_temp_message(
+            context.bot,
+            update.effective_chat.id,
+            f"👋 Welcome {username}!\n\n📸 This group is for image editing requests only.\nTo request an image edit, please DM me directly."
+        )
 
 async def moderate_group_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type == "private":
@@ -36,76 +94,10 @@ async def moderate_group_messages(update: Update, context: ContextTypes.DEFAULT_
             "⚠️ Only admins can post here. All image editing requests must be sent to the bot via DM."
         )
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    data = query.data
-    if data == "check_status":
-        r = next((r for r in request_queue if r["id"] == user_id), None)
-        msg = "❌ No request found." if not r else (
-            "🕐 Pending..." if r["status"] == "pending" else "✅ Completed!")
-        await query.edit_message_text(msg, reply_markup=get_user_menu(user_id))
-    elif data == "cancel_request":
-        i = next((i for i, r in enumerate(request_queue) if r["id"] == user_id), None)
-        if i is not None:
-            cancelled_request = request_queue.pop(i)
-            cancelled_request["status"] = "cancelled"
-            log_to_sheet(cancelled_request)
-            save_queue()
-            await query.edit_message_text("❌ Your request has been canceled.", reply_markup=get_user_menu(user_id))
-        else:
-            await query.edit_message_text("No active request.", reply_markup=get_user_menu(user_id))
-    elif data == "submit_request":
-        await query.edit_message_text(
-            "📸 To submit a request:\n\nPlease send a photo with a caption describing what you want edited.",
-            reply_markup=get_user_menu(user_id))
-    elif data.startswith("admin_done:"):
-        if not is_admin(user_id):
-            await query.edit_message_text("Not authorized.", reply_markup=get_user_menu(user_id))
-            return
-        tid = int(data.split(":")[1])
-        for r in request_queue:
-            if r["id"] == tid:
-                r["status"] = "done"
-                save_queue()
-                await query.edit_message_text(f"{r['name']}'s request marked done.", reply_markup=get_user_menu(user_id))
-                try:
-                    await context.bot.send_message(chat_id=tid, text="✅ Your request has been completed!")
-                except:
-                    pass
-                return
-        await query.edit_message_text("User not found.", reply_markup=get_user_menu(user_id))
+# === Add rest of bot logic ===
+# ... (start, handle_request, check_status, handle_callback, reset, show_queue, etc.)
 
-async def check_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    request = next((r for r in request_queue if r["id"] == user_id), None)
-    if not request:
-        await update.message.reply_text("❗ You have no active request in the queue.", reply_markup=get_user_menu(user_id))
-    elif request["status"] == "pending":
-        await update.message.reply_text("🕐 Your request is still pending.", reply_markup=get_user_menu(user_id))
-    else:
-        await update.message.reply_text("✅ Your request has been completed!", reply_markup=get_user_menu(user_id))
-
-async def show_queue(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("Not authorized.")
-        return
-    if not request_queue:
-        await update.message.reply_text("Queue is empty.")
-        return
-    for i, r in enumerate(request_queue, 1):
-        btn = InlineKeyboardMarkup([[InlineKeyboardButton("Mark as Done", callback_data=f"admin_done:{r['id']}")]])
-        text = f"{i}. {r['name']} - {r['type']} - {r['status']}"
-        await update.message.reply_text(text, reply_markup=btn)
-
-async def manual_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if is_admin(update.message.from_user.id):
-        reset_queue()
-        await update.message.reply_text("Queue reset.")
-    else:
-        await update.message.reply_text("Not authorized.")
-
+# Flask web dashboard
 flask_app = Flask(__name__)
 TEMPLATE = """
 <!doctype html>
