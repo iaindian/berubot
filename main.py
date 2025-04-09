@@ -333,7 +333,7 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, handle_request))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
-    app.add_handler(MessageHandler(filters.ALL, track_admin_post), group=True)
+    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, track_admin_post), group=True)
     app.add_handler(MessageHandler(filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS), moderate_group_messages), group=True)
 
     app.run_polling()
