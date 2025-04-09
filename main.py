@@ -75,23 +75,32 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def moderate_group_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type == "private":
         return
+
     user_id = update.message.from_user.id
     chat = update.message.chat
-    if update.message.reply_to_message:
+
+    # ✅ Allow replies and user leave system messages
+    if update.message.reply_to_message or update.message.left_chat_member:
         return
-    if update.message.left_chat_member:
-        return
+
     member = await context.bot.get_chat_member(chat.id, user_id)
-    if member.status not in ["administrator", "creator"]:
-        try:
-            await update.message.delete()
-        except:
-            pass
-        await send_temp_message(
-            context.bot,
-            chat.id,
-            "⚠️ Only admins can post here. All image editing requests must be sent to the bot via DM."
-        )
+
+    if member.status in ["administrator", "creator"]:
+        # 🔄 Track admin's post
+        context.chat_data["last_admin_message_id"] = update.message.message_id
+        return  # ✅ Let admin message stay
+
+    # ❌ Delete message from non-admins
+    try:
+        await update.message.delete()
+    except:
+        pass
+
+    await send_temp_message(
+        context.bot,
+        chat.id,
+        "⚠️ Only admins can post here. All image editing requests must be sent to the bot via DM."
+    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
@@ -247,7 +256,6 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, handle_request))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, track_admin_post), group=True)
     app.add_handler(MessageHandler(filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS), moderate_group_messages), group=True)
 
     app.run_polling()
