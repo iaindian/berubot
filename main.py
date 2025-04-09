@@ -170,6 +170,15 @@ async def moderate_group_messages(update: Update,
  
     user_id = update.message.from_user.id
     chat = update.message.chat
+    
+    # ✅ Allow replies to messages (like replying to bot’s posts)
+    if update.message.reply_to_message:
+        return
+
+    # ✅ Allow "user left the group" system messages
+    if update.message.left_chat_member:
+        return
+
  
     # Get the sender's role
     member = await context.bot.get_chat_member(chat.id, user_id)
