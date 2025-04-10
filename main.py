@@ -79,7 +79,15 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def moderate_group_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type == "private": return
-    if update.message.reply_to_message or update.message.left_chat_member: return
+    if update.message.reply_to_message:  return
+    
+    if update.message.left_chat_member:
+       try:
+           await update.message.delete()
+       except:
+           pass
+       return
+   
     user_id = update.message.from_user.id
     chat = update.message.chat
     member = await context.bot.get_chat_member(chat.id, user_id)
