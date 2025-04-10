@@ -198,7 +198,8 @@ TEMPLATE = """<!doctype html><title>Queue</title><h2>Queue ({{ queue|length }}/{
 <a href="https://api.telegram.org/file/bot{{ bot_token }}/{{ r.file_path }}" target="_blank">Download</a><br>
 <i>{{ r.caption }}</i>
 {% endif %}</li><hr>
-{% endfor %}</ul><form action="/reset" method="post"><button>Reset Queue</button></form>"""
+{% endfor %}</ul>
+"""
 
 
 USER_TEMPLATE = """
