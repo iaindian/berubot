@@ -212,9 +212,9 @@ USER_TEMPLATE = """
         <th>Status</th>
         <th>Expected Delivery</th>
     </tr>
-    {% for i, r in enumerate(queue, 1) %}
+    {% for r in queue %}
     <tr>
-        <td>{{ i }}</td>
+        <td>{{ loop.index }}</td>
         <td>{{ r.name }}</td>
         <td>{{ r.status }}</td>
         <td>{{ r.expected }}</td>
