@@ -8,7 +8,7 @@ from telegram.ext import (
     filters, ContextTypes, CallbackQueryHandler
 )
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template_string, redirect
 import threading
 import requests
@@ -117,7 +117,8 @@ async def handle_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "id": user.id, "name": user.username or user.first_name,
         "status": "pending", "type": "photo",
         "photo_id": update.message.photo[-1].file_id,
-        "caption": update.message.caption or "No caption"
+        "caption": update.message.caption or "No caption",
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     request_queue.append(req)
     save_queue()
@@ -199,6 +200,29 @@ TEMPLATE = """<!doctype html><title>Queue</title><h2>Queue ({{ queue|length }}/{
 {% endif %}</li><hr>
 {% endfor %}</ul><form action="/reset" method="post"><button>Reset Queue</button></form>"""
 
+
+USER_TEMPLATE = """
+<!doctype html>
+<title>Queue Status</title>
+<h2>Current Queue ({{ queue|length }})</h2>
+<table border="1" cellspacing="0" cellpadding="5">
+    <tr>
+        <th>#</th>
+        <th>User</th>
+        <th>Status</th>
+        <th>Expected Delivery</th>
+    </tr>
+    {% for i, r in enumerate(queue, 1) %}
+    <tr>
+        <td>{{ i }}</td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.status }}</td>
+        <td>{{ r.expected }}</td>
+    </tr>
+    {% endfor %}
+</table>
+"""
+
 @flask_app.route("/")
 def index():
     display = []
@@ -212,10 +236,29 @@ def index():
         display.append(item)
     return render_template_string(TEMPLATE, queue=display, bot_token=BOT_TOKEN, max_requests=MAX_REQUESTS)
 
-@flask_app.route("/reset")
+@flask_app.route("/reset", methods=["GET", "POST"])
 def reset(): reset_queue(); return redirect("/")
 
-
+@flask_app.route("/status")
+def public_status():
+    display = []
+    for r in request_queue:
+        item = {
+            "name": r["name"],
+            "status": r["status"]
+        }
+        try:
+            # Extract timestamp from each request (add it when appending to queue)
+            timestamp = r.get("timestamp")
+            if timestamp:
+                dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+                item["expected"] = (dt + timedelta(hours=48)).strftime("%b %d, %I:%M %p")
+            else:
+                item["expected"] = "Unknown"
+        except:
+            item["expected"] = "Unknown"
+        display.append(item)
+    return render_template_string(USER_TEMPLATE, queue=display)
 
 @flask_app.route("/download-queue")
 def download_queue():
