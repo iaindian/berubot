@@ -223,8 +223,87 @@ USER_TEMPLATE = """
 </table>
 """
 
+LANDING_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BeruBot – Behrupiya Edits</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      padding: 40px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+    p {
+      font-size: 1.1em;
+      margin: 10px auto;
+      max-width: 600px;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 20px 0;
+    }
+    ul li {
+      background: #111;
+      margin: 10px auto;
+      padding: 10px 20px;
+      border: 1px solid #333;
+      max-width: 400px;
+      border-radius: 6px;
+    }
+    a {
+      color: #fff;
+      background: #333;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 6px;
+      display: inline-block;
+      margin: 10px;
+      transition: background 0.3s ease;
+    }
+    a:hover {
+      background: #fff;
+      color: #000;
+    }
+    hr {
+      margin: 30px auto;
+      width: 60%;
+      border: 1px solid #444;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to Behrupiya Edits 💀</h1>
+  <p>BeruBot is your NSFW fantasy image editing genie.</p>
+  <ul>
+    <li>💥 Realistic edits of your wildest dreams</li>
+    <li>🔞 NSFW with a purpose — Respect in Real Life</li>
+    <li>⏱️ Free queue: 24–48hr SLA</li>
+    <li>⚡ Fast delivery: Paid options available</li>
+  </ul>
+  <a href="https://t.me/behrupiya_bot" target="_blank">👉 Chat with BeruBot on Telegram</a>
+  <hr>
+  <a href="/status">View Public Queue</a>
+</body>
+</html>
+"""
+
+
 @flask_app.route("/")
-def index():
+def landing_page():
+    return render_template_string(LANDING_TEMPLATE)
+
+
+@flask_app.route("/adminbeh")
+def admin_queue():
     display = []
     for r in request_queue:
         item = r.copy()
@@ -232,9 +311,24 @@ def index():
             try:
                 f = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={r['photo_id']}").json()
                 item["file_path"] = f["result"]["file_path"]
-            except: item["file_path"] = ""
+            except:
+                item["file_path"] = ""
         display.append(item)
     return render_template_string(TEMPLATE, queue=display, bot_token=BOT_TOKEN, max_requests=MAX_REQUESTS)
+
+
+# @flask_app.route("/")
+# def index():
+#     display = []
+#     for r in request_queue:
+#         item = r.copy()
+#         if r["type"] == "photo":
+#             try:
+#                 f = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={r['photo_id']}").json()
+#                 item["file_path"] = f["result"]["file_path"]
+#             except: item["file_path"] = ""
+#         display.append(item)
+#     return render_template_string(TEMPLATE, queue=display, bot_token=BOT_TOKEN, max_requests=MAX_REQUESTS)
 
 @flask_app.route("/reset", methods=["GET", "POST"])
 def reset(): reset_queue(); return redirect("/")
