@@ -126,7 +126,7 @@ async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data = {
                 "type": "event",
                 "event_name": f"user_{event_type}",
-                "url": "https://btracker-779c.onrender.com",
+                "url": "https://berubot.onrender.com",
                 "website_id": UMAMI_SITE_ID,
                 "timestamp": datetime.utcnow().isoformat(),
                 "user_agent": "berubot",
@@ -148,7 +148,7 @@ async def track_edit_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data = {
                 "type": "event",
                 "event_name": "edit_post",
-                "url": "https://btracker-779c.onrender.com",
+                "url": "https://berubot.onrender.com",
                 "website_id": UMAMI_SITE_ID,
                 "timestamp": datetime.utcnow().isoformat(),
                 "user_agent": "berubot",
