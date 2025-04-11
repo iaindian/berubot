@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-from flask import Flask, render_template_string, redirect
+from flask import Flask, render_template_string, redirect, send_file, request
 import threading
 import requests
 import logging
@@ -20,6 +20,7 @@ import asyncio
 
 request_queue = []
 MAX_REQUESTS = 50
+EDIT_TRACK_KEYWORD = "#behrupiyaedit"
 
 if os.path.exists("queue.json"):
     with open("queue.json", "r") as f:
@@ -28,6 +29,10 @@ if os.path.exists("queue.json"):
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID"))
 GOOGLE_CREDENTIALS = os.environ.get("GOOGLE_CREDENTIALS")
+QUEUE_PASSWORD = os.environ.get("QUEUE_PASSWORD")
+UMAMI_URL = os.environ.get("UMAMI_URL")
+UMAMI_TOKEN = os.environ.get("UMAMI_TOKEN")
+UMAMI_SITE_ID = os.environ.get("UMAMI_SITE_ID")
 CREDS_FILE = "credentials.json"
 
 if GOOGLE_CREDENTIALS:
@@ -98,6 +103,59 @@ async def moderate_group_messages(update: Update, context: ContextTypes.DEFAULT_
         context.bot, chat.id,
         "⚠️ Only admins can post here. Please DM the bot for any requests."
     )
+
+async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = None
+    event_type = None
+
+    if update.message.new_chat_members:
+        for member in update.message.new_chat_members:
+            user = member
+            event_type = "joined"
+    elif update.message.left_chat_member:
+        user = update.message.left_chat_member
+        event_type = "left"
+
+    if user and event_type:
+        try:
+            data = {
+                "type": "event",
+                "event_name": f"user_{event_type}",
+                "url": "https://btracker-779c.onrender.com",
+                "website_id": UMAMI_SITE_ID,
+                "timestamp": datetime.utcnow().isoformat(),
+                "user_agent": "berubot",
+                "data": {
+                    "username": user.username or user.full_name,
+                    "user_id": user.id
+                }
+            }
+            headers = {"Authorization": f"Bearer {UMAMI_TOKEN}"}
+            requests.post(UMAMI_URL, json=data, headers=headers)
+        except Exception as e:
+            print("UMAMI USER TRACK FAILED:", e)
+
+async def track_edit_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type != "supergroup": return
+    if EDIT_TRACK_KEYWORD in (update.message.caption or ""):
+        try:
+            data = {
+                "type": "event",
+                "event_name": "edit_post",
+                "url": "https://btracker-779c.onrender.com",
+                "website_id": UMAMI_SITE_ID,
+                "timestamp": datetime.utcnow().isoformat(),
+                "user_agent": "berubot",
+                "data": {
+                    "caption": update.message.caption,
+                    "username": update.message.from_user.username,
+                    "photos": len(update.message.photo)
+                }
+            }
+            headers = {"Authorization": f"Bearer {UMAMI_TOKEN}"}
+            requests.post(UMAMI_URL, json=data, headers=headers)
+        except Exception as e:
+            print("UMAMI EDIT TRACK FAILED:", e)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.message.from_user.id
@@ -311,8 +369,27 @@ def landing_page():
     return render_template_string(LANDING_TEMPLATE)
 
 
+# @flask_app.route("/adminbeh")
+# def admin_queue():
+#     display = []
+#     for r in request_queue:
+#         item = r.copy()
+#         if r["type"] == "photo":
+#             try:
+#                 f = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={r['photo_id']}").json()
+#                 item["file_path"] = f["result"]["file_path"]
+#             except:
+#                 item["file_path"] = ""
+#         display.append(item)
+#     return render_template_string(TEMPLATE, queue=display, bot_token=BOT_TOKEN, max_requests=MAX_REQUESTS)
+
+
 @flask_app.route("/adminbeh")
 def admin_queue():
+    pwd = request.args.get("password")
+    if pwd != QUEUE_PASSWORD:
+        return "Unauthorized. Invalid password.", 401
+
     display = []
     for r in request_queue:
         item = r.copy()
@@ -323,7 +400,9 @@ def admin_queue():
             except:
                 item["file_path"] = ""
         display.append(item)
+
     return render_template_string(TEMPLATE, queue=display, bot_token=BOT_TOKEN, max_requests=MAX_REQUESTS)
+
 
 
 # @flask_app.route("/")
@@ -341,6 +420,33 @@ def admin_queue():
 
 @flask_app.route("/reset", methods=["GET", "POST"])
 def reset(): reset_queue(); return redirect("/")
+
+@flask_app.route("/download-queue")
+def download_queue():
+    pwd = request.args.get("password")
+    if pwd != QUEUE_PASSWORD:
+        return "Unauthorized. Invalid password.", 401
+
+    if os.path.exists("queue.json"):
+        return send_file("queue.json", as_attachment=True)
+    return "No queue file found.", 404
+
+
+@flask_app.route("/restore-queue", methods=["POST"])
+def restore_queue():
+    pwd = request.args.get("password")
+    if pwd != QUEUE_PASSWORD:
+        return "Unauthorized", 401
+
+    data = request.get_json()
+    if not isinstance(data, list):
+        return "Invalid format", 400
+
+    with open("queue.json", "w") as f:
+        json.dump(data, f)
+
+    return "Queue restored", 200
+
 
 @flask_app.route("/status")
 def public_status():
@@ -363,11 +469,6 @@ def public_status():
         display.append(item)
     return render_template_string(USER_TEMPLATE, queue=display)
 
-@flask_app.route("/download-queue")
-def download_queue():
-    if os.path.exists("queue.json"):
-        return send_file("queue.json", as_attachment=True)
-    return "No queue file found.", 404
 
 
 if __name__ == "__main__":
@@ -385,5 +486,8 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
     app.add_handler(MessageHandler(filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS), moderate_group_messages), group=True)
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, track_membership), group=True)    
+    app.add_handler(MessageHandler(filters.ALL & filters.Caption(EDIT_TRACK_KEYWORD), track_edit_posts), group=True)
+
 
     app.run_polling()
