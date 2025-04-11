@@ -18,6 +18,9 @@ import os
 import json
 import asyncio
 
+
+logging.basicConfig(level=logging.INFO)
+
 request_queue = []
 MAX_REQUESTS = 50
 EDIT_TRACK_KEYWORD = "#behrupiyaedit"
@@ -105,6 +108,7 @@ async def moderate_group_messages(update: Update, context: ContextTypes.DEFAULT_
     )
 
 async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("🔍 track_membership triggered")
     user = None
     event_type = None
 
@@ -117,6 +121,7 @@ async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
         event_type = "left"
 
     if user and event_type:
+        print("Inside try")
         try:
             data = {
                 "type": "event",
