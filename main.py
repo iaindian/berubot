@@ -131,7 +131,8 @@ async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 }
             }
             headers = {"Authorization": f"Bearer {UMAMI_TOKEN}"}
-            requests.post(UMAMI_URL, json=data, headers=headers)
+            response  = requests.post(UMAMI_URL, json=data, headers=headers)
+            print("UMAMI Response:", response.status_code, response.text)
         except Exception as e:
             print("UMAMI USER TRACK FAILED:", e)
 
