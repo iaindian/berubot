@@ -532,7 +532,7 @@ if __name__ == "__main__":
     scheduler = BackgroundScheduler()
     scheduler.add_job(reset_queue, 'cron', hour=0, minute=0)
     scheduler.start()
-    moderation_filter = filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS) & (~filters.StatusUpdate.LEFT_CHAT_MEMBER)
+    moderation_filter = filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS) & (~filters.StatusUpdate.LEFT_CHAT_MEMBER) & (~filters.Caption(EDIT_TRACK_KEYWORD))
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -545,7 +545,7 @@ if __name__ == "__main__":
 
     app.add_handler(MessageHandler(moderation_filter, moderate_group_messages), group=True)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, track_membership), group=True)    
-    app.add_handler(MessageHandler(filters.ALL & filters.Caption(EDIT_TRACK_KEYWORD), track_edit_posts), group=True)
+    app.add_handler(MessageHandler(filters.Caption(EDIT_TRACK_KEYWORD), track_edit_posts), group=True)
 
 
     app.run_polling()
