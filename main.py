@@ -104,7 +104,7 @@ def get_user_menu(user_id):
 async def send_temp_message(bot, chat_id, text, **kwargs):
     try:
         msg = await bot.send_message(chat_id=chat_id, text=text, **kwargs)
-        await asyncio.sleep(60)
+        await asyncio.sleep(5)
         await bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
     except: pass
 
