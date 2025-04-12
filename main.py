@@ -88,12 +88,12 @@ async def moderate_group_messages(update: Update, context: ContextTypes.DEFAULT_
     if update.message.chat.type == "private": return
     if update.message.reply_to_message:  return
     
-    if update.message.left_chat_member:
-       try:
-           await update.message.delete()
-       except:
-           pass
-       return
+    # if update.message.left_chat_member:
+    #    try:
+    #        await update.message.delete()
+    #    except:
+    #        pass
+    #    return
    
     user_id = update.message.from_user.id
     chat = update.message.chat
@@ -152,6 +152,13 @@ async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             print("UMAMI USER TRACK FAILED:", e)
+        
+        if event_type == "left":
+            try:
+                await update.message.delete()
+                print("✅ Left message deleted")
+            except Exception as e:
+                print("❌ Failed to delete left message:", e)
 
 
 async def track_edit_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
