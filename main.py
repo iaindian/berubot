@@ -7,6 +7,7 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     filters, ContextTypes, CallbackQueryHandler
 )
+from telegram.ext import filters
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta, UTC
 from flask import Flask, render_template_string, redirect, send_file, request
@@ -531,6 +532,7 @@ if __name__ == "__main__":
     scheduler = BackgroundScheduler()
     scheduler.add_job(reset_queue, 'cron', hour=0, minute=0)
     scheduler.start()
+    moderation_filter = filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS) & (~filters.StatusUpdate.LEFT_CHAT_MEMBER)
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -540,7 +542,8 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO, handle_request))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
-    app.add_handler(MessageHandler(filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS), moderate_group_messages), group=True)
+
+    app.add_handler(MessageHandler(moderation_filter, moderate_group_messages), group=True)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, track_membership), group=True)    
     app.add_handler(MessageHandler(filters.ALL & filters.Caption(EDIT_TRACK_KEYWORD), track_edit_posts), group=True)
 
