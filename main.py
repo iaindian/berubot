@@ -8,7 +8,7 @@ from telegram.ext import (
     filters, ContextTypes, CallbackQueryHandler
 )
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from flask import Flask, render_template_string, redirect, send_file, request
 import threading
 import requests
@@ -17,7 +17,6 @@ import base64
 import os
 import json
 import asyncio
-
 
 logging.basicConfig(level=logging.INFO)
 
@@ -121,48 +120,90 @@ async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
         event_type = "left"
 
     if user and event_type:
-        print("Inside try")
         try:
-            data = {
+            payload = {
                 "type": "event",
-                "event_name": f"user_{event_type}",
-                "url": "https://berubot.onrender.com",
-                "website_id": UMAMI_SITE_ID,
-                "timestamp": datetime.utcnow().isoformat(),
-                "user_agent": "berubot",
-                "data": {
-                    "username": user.username or user.full_name,
-                    "user_id": user.id
+                "payload": {
+                    "hostname": "berubot.onrender.com",
+                    "language": "en-US",
+                    "referrer": "",
+                    "screen": "1920x1080",
+                    "title": "Telegram",
+                    "url": "/",
+                    "website": UMAMI_SITE_ID,
+                    "name": f"user_{event_type}",
+                    "data": {
+                        "username": user.username or user.full_name,
+                        "user_id": user.id,
+                        "timestamp": datetime.now(UTC).isoformat()
+                    }
                 }
             }
-            headers = {"Authorization": f"Bearer {UMAMI_TOKEN}"}
-            print("Tracking event:", json.dumps(data, indent=2))
-            response  = requests.post(UMAMI_URL, json=data, headers=headers)
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {UMAMI_TOKEN}",
+                "User-Agent": "berubot"
+            }
+
+            print("Sending to Umami:", json.dumps(payload, indent=2))
+            response = requests.post(UMAMI_URL, json=payload, headers=headers)
             print("UMAMI Response:", response.status_code, response.text)
+
         except Exception as e:
             print("UMAMI USER TRACK FAILED:", e)
 
+
 async def track_edit_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.chat.type != "supergroup": return
-    if EDIT_TRACK_KEYWORD in (update.message.caption or ""):
-        try:
-            data = {
-                "type": "event",
-                "event_name": "edit_post",
-                "url": "https://berubot.onrender.com",
-                "website_id": UMAMI_SITE_ID,
-                "timestamp": datetime.utcnow().isoformat(),
-                "user_agent": "berubot",
+    try:
+        message = update.message
+        if message.chat.type != "supergroup":
+            return
+
+        caption = message.caption or ""
+        if EDIT_TRACK_KEYWORD not in caption:
+            return
+
+        user_id = message.from_user.id
+        chat_id = message.chat.id
+        member = await context.bot.get_chat_member(chat_id, user_id)
+
+        if member.status not in ["administrator", "creator"]:
+            return  # Ignore if not admin
+
+        payload = {
+            "type": "event",
+            "payload": {
+                "hostname": "berubot.onrender.com",
+                "language": "en-US",
+                "referrer": "",
+                "screen": "1920x1080",
+                "title": "edit_post",
+                "url": "/",
+                "website": UMAMI_SITE_ID,
+                "name": "edit_post",
                 "data": {
-                    "caption": update.message.caption,
-                    "username": update.message.from_user.username,
-                    "photos": len(update.message.photo)
+                    "username": message.from_user.username,
+                    "caption": caption,
+                    "photos": len(message.photo),
+                    "timestamp": datetime.now().astimezone().isoformat()
                 }
             }
-            headers = {"Authorization": f"Bearer {UMAMI_TOKEN}"}
-            requests.post(UMAMI_URL, json=data, headers=headers)
-        except Exception as e:
-            print("UMAMI EDIT TRACK FAILED:", e)
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {UMAMI_TOKEN}",
+            "User-Agent": "berubot"
+        }
+
+        response = requests.post(UMAMI_URL, headers=headers, json=payload)
+        print("UMAMI Response:", response.status_code, response.text)
+
+    except Exception as e:
+        print("UMAMI TRACK EDIT ERROR:", e)
+
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.message.from_user.id
