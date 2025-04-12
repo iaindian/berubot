@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 
 request_queue = []
 MAX_REQUESTS = 50
-EDIT_TRACK_KEYWORD = "#behrupiyaedit"
+EDIT_TRACK_KEYWORD = "#behrupiyaedits"
 
 if os.path.exists("queue.json"):
     with open("queue.json", "r") as f:
