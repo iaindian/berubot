@@ -55,6 +55,40 @@ def reset_queue():
     if os.path.exists("queue.json"):
         os.remove("queue.json")
 
+from datetime import datetime, timezone
+
+def track_umami_event(event_name, data):
+    payload = {
+        "type": "event",
+        "payload": {
+            "hostname": "berubot.onrender.com",
+            "language": "en-US",
+            "referrer": "",
+            "screen": "unknown",
+            "title": event_name,
+            "url": "/",
+            "website": UMAMI_SITE_ID,
+            "name": event_name,
+            "data": {
+                **data,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {UMAMI_TOKEN}",
+        "User-Agent": "berubot"
+    }
+
+    try:
+        res = requests.post(UMAMI_URL, json=payload, headers=headers, timeout=10)
+        print("UMAMI TRACK:", res.status_code, res.text)
+    except Exception as e:
+        print("UMAMI TRACK FAILED:", e)
+
+
 def is_admin(user_id):
     return user_id == ADMIN_ID
 
@@ -162,54 +196,54 @@ async def track_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print("❌ Failed to delete left message:", e)
 
 
-async def track_edit_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        message = update.message
-        if message.chat.type != "supergroup":
-            return
+# async def track_edit_posts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     try:
+#         message = update.message
+#         if message.chat.type != "supergroup":
+#             return
 
-        caption = message.caption or ""
-        if EDIT_TRACK_KEYWORD not in caption:
-            return
+#         caption = message.caption or ""
+#         if EDIT_TRACK_KEYWORD not in caption:
+#             return
 
-        user_id = message.from_user.id
-        chat_id = message.chat.id
-        member = await context.bot.get_chat_member(chat_id, user_id)
+#         user_id = message.from_user.id
+#         chat_id = message.chat.id
+#         member = await context.bot.get_chat_member(chat_id, user_id)
 
-        if member.status not in ["administrator", "creator"]:
-            return  # Ignore if not admin
+#         if member.status not in ["administrator", "creator"]:
+#             return  # Ignore if not admin
 
-        payload = {
-            "type": "event",
-            "payload": {
-                "hostname": "berubot.onrender.com",
-                "language": "en-US",
-                "referrer": "",
-                "screen": "1920x1080",
-                "title": "edit_post",
-                "url": "/",
-                "website": UMAMI_SITE_ID,
-                "name": "edit_post",
-                "data": {
-                    "username": message.from_user.username,
-                    "caption": caption,
-                    "photos": len(message.photo),
-                    "timestamp": datetime.now().astimezone().isoformat()
-                }
-            }
-        }
+#         payload = {
+#             "type": "event",
+#             "payload": {
+#                 "hostname": "berubot.onrender.com",
+#                 "language": "en-US",
+#                 "referrer": "",
+#                 "screen": "1920x1080",
+#                 "title": "edit_post",
+#                 "url": "/",
+#                 "website": UMAMI_SITE_ID,
+#                 "name": "edit_post",
+#                 "data": {
+#                     "username": message.from_user.username,
+#                     "caption": caption,
+#                     "photos": len(message.photo),
+#                     "timestamp": datetime.now().astimezone().isoformat()
+#                 }
+#             }
+#         }
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {UMAMI_TOKEN}",
-            "User-Agent": "berubot"
-        }
+#         headers = {
+#             "Content-Type": "application/json",
+#             "Authorization": f"Bearer {UMAMI_TOKEN}",
+#             "User-Agent": "berubot"
+#         }
 
-        response = requests.post(UMAMI_URL, headers=headers, json=payload)
-        print("UMAMI Response:", response.status_code, response.text)
+#         response = requests.post(UMAMI_URL, headers=headers, json=payload)
+#         print("UMAMI Response:", response.status_code, response.text)
 
-    except Exception as e:
-        print("UMAMI TRACK EDIT ERROR:", e)
+#     except Exception as e:
+#         print("UMAMI TRACK EDIT ERROR:", e)
 
 
 
@@ -233,6 +267,7 @@ async def handle_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.photo:
         await update.message.reply_text("❗ Only image requests allowed. Send a photo + caption.", reply_markup=get_user_menu(user.id))
         return
+    
     if not update.message.caption:
         await update.message.reply_text("📸 Got the image. Next time add a caption too.", reply_markup=get_user_menu(user.id))
     req = {
@@ -244,6 +279,11 @@ async def handle_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     request_queue.append(req)
     save_queue()
+    track_umami_event("image_edit_request", {
+    "user_id": user.id,
+    "username": user.username or user.first_name,
+    "caption": update.message.caption or "No caption"
+    })
     await update.message.reply_text(
         f"✅ Request received. You're #{len(request_queue)} in the queue.\n\n"
         "⏱️ SLA: 24–48 hours\n"
@@ -545,7 +585,7 @@ if __name__ == "__main__":
 
     app.add_handler(MessageHandler(moderation_filter, moderate_group_messages), group=True)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS | filters.StatusUpdate.LEFT_CHAT_MEMBER, track_membership), group=True)    
-    app.add_handler(MessageHandler(filters.Caption(EDIT_TRACK_KEYWORD), track_edit_posts), group=True)
+    # app.add_handler(MessageHandler(filters.Caption(EDIT_TRACK_KEYWORD), track_edit_posts), group=True)
 
 
     app.run_polling()
