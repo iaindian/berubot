@@ -514,8 +514,24 @@ def admin_queue():
 #         display.append(item)
 #     return render_template_string(TEMPLATE, queue=display, bot_token=BOT_TOKEN, max_requests=MAX_REQUESTS)
 
+# @flask_app.route("/reset", methods=["GET", "POST"])
+# def reset(): reset_queue(); return redirect("/")
+
 @flask_app.route("/reset", methods=["GET", "POST"])
-def reset(): reset_queue(); return redirect("/")
+def reset():
+    pwd = request.args.get("password")
+    if pwd != QUEUE_PASSWORD:
+        logging.warning(f"❌ Unauthorized queue reset attempt! IP: {request.remote_addr}")
+        return "Unauthorized", 401
+
+    logging.warning(f"⚠️ Queue reset triggered! IP: {request.remote_addr}")
+    track_umami_event("queue_reset", {
+        "by": "web",
+        "ip": request.remote_addr
+    })
+    
+    reset_queue()
+    return redirect("/")
 
 @flask_app.route("/download-queue")
 def download_queue():
