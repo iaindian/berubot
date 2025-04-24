@@ -608,8 +608,9 @@ def public_status():
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
+    port = int(os.environ.get("PORT", 8080))
+    threading.Thread(target=lambda: flask_app.run(host="0.0.0.0", port=port)).start()
     
-    threading.Thread(target=lambda: flask_app.run(host="0.0.0.0", port=8080)).start()
     scheduler = BackgroundScheduler()
     scheduler.add_job(reset_queue, 'cron', hour=0, minute=0)
     scheduler.start()
