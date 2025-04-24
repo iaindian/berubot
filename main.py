@@ -18,6 +18,8 @@ import base64
 import os
 import json
 import asyncio
+import signal
+import sys
 
 logging.basicConfig(level=logging.INFO)
 
@@ -25,9 +27,24 @@ request_queue = []
 MAX_REQUESTS = 50
 EDIT_TRACK_KEYWORD = "#behrupiyaedits"
 
-if os.path.exists("queue.json"):
-    with open("queue.json", "r") as f:
-        request_queue = json.load(f)
+
+def handle_exit(*args):
+    logging.warning("🛑 Server shutting down. Saving queue...")
+    save_queue()
+    sys.exit(0)
+
+
+def load_queue():
+    global request_queue
+    if os.path.exists("queue.json"):
+        try:
+            with open("queue.json", "r") as f:
+                request_queue = json.load(f)
+                logging.info("✅ Queue loaded successfully from disk.")
+        except Exception as e:
+            logging.error(f"❌ Failed to load queue: {e}")
+
+load_queue()
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID"))
@@ -44,10 +61,15 @@ if GOOGLE_CREDENTIALS:
         f.write(creds_json)
     with open(CREDS_FILE, "r") as f:
         print("DEBUG CREDENTIALS:", f.read())
+        
 
 def save_queue():
-    with open("queue.json", "w") as f:
-        json.dump(request_queue, f)
+    try:
+        with open("queue.json", "w") as f:
+            json.dump(request_queue, f)
+        logging.info(f"💾 Queue saved ({len(request_queue)} items).")
+    except Exception as e:
+        logging.error(f"❌ Failed to save queue: {e}")
 
 def reset_queue():
     global request_queue
@@ -584,6 +606,9 @@ def public_status():
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handle_exit)
+    signal.signal(signal.SIGTERM, handle_exit)
+    
     threading.Thread(target=lambda: flask_app.run(host="0.0.0.0", port=8080)).start()
     scheduler = BackgroundScheduler()
     scheduler.add_job(reset_queue, 'cron', hour=0, minute=0)
