@@ -611,9 +611,10 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     threading.Thread(target=lambda: flask_app.run(host="0.0.0.0", port=port)).start()
     
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(reset_queue, 'cron', hour=0, minute=0)
-    scheduler.start()
+    # uncomment this line for reseting queue daily
+    # scheduler = BackgroundScheduler()
+    # scheduler.add_job(reset_queue, 'cron', hour=0, minute=0)
+    # scheduler.start()
     moderation_filter = filters.ALL & (~filters.StatusUpdate.NEW_CHAT_MEMBERS) & (~filters.StatusUpdate.LEFT_CHAT_MEMBER) & (~filters.Caption(EDIT_TRACK_KEYWORD))
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
